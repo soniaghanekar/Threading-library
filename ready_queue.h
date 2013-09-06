@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 typedef struct Thread {
-	ucontext_t *uctxt;
+	ucontext_t uctxt;
 } Thread;	
 
 typedef struct node {
