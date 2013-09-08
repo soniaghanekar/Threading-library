@@ -7,7 +7,7 @@ typedef struct Thread {
 } Thread;	
 
 typedef struct node {
-	Thread thread;
+	Thread *thread;
 	struct node *next;
 } node;	
 
@@ -19,6 +19,8 @@ typedef struct ReadyQueue {
 void initializeQueue(ReadyQueue *q);
 
 int isQueueEmpty(ReadyQueue *q);
+
+int sizeOfQueue(ReadyQueue *q);
 
 void insertIntoQueue(ReadyQueue *q, Thread thread);
 
