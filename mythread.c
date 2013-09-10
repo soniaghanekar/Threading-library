@@ -1,93 +1,99 @@
-#include "ready_queue.h"
+#include "queue.h"
 #include "mythread.h"
 
 #define handle_error(msg) \
 do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
-ReadyQueue *queue;
+Queue *readyQueue;
 Thread *currentThread;
 
-
-Thread *newThread() {
-	return malloc(sizeof(Thread));
-}	
-
-
-void initializeStack(ucontext_t *uctxt) {
-	char *stack = (char *)malloc(384*sizeof(char));
-	(uctxt->uc_stack).ss_sp = stack;
-	(uctxt->uc_stack).ss_size = sizeof(stack);
-}
-
-
-Thread *createThreadAndAddToQueue(void(*start_funct)(void *), void *args, ucontext_t *next_context) {
-	Thread *thread = newThread();
-	ucontext_t *uctxt = malloc(sizeof(ucontext_t));
+Thread *initializeThread(void (*start_funct)(void *), void *args) {
 	
-	if(getcontext(uctxt) == -1)
+	Thread *thread = (Thread *)malloc(sizeof(Thread));
+	ucontext_t *ctxt = (ucontext_t *)malloc(sizeof(ucontext_t));
+	
+	if(getcontext(ctxt) == -1)
 		handle_error("Could not get context");
+		
+	char *stack = (char *)malloc(16384*sizeof(char));
+	(ctxt->uc_stack).ss_sp = stack;
+	(ctxt->uc_stack).ss_size = 16384;
+	ctxt->uc_link = (!isQueueEmpty(readyQueue)) ? &(readyQueue->front->thread->uctxt) : NULL;
 	
-	char *stack = (char *)malloc(384*sizeof(char));
-	(uctxt->uc_stack).ss_sp = stack;
-	(uctxt->uc_stack).ss_size = sizeof(stack);	
-	//initializeStack(uctxt);
-	
-	uctxt->uc_link = next_context;	
-	makecontext(uctxt, (void (*)())start_funct, 1, args);
-	thread->uctxt= uctxt;
-	
-	//Thread *thread1 = newThread();
-	//ucontext_t *p;
-	//thread1->uctxt = uctxt;
-	
-	insertIntoQueue(queue, *thread);
-	printf("After insert in queue");
+	makecontext(ctxt, (void (*)()) start_funct, 1, args);	
+		
+	thread->uctxt = *ctxt;
 	return thread;
 }	
 
 
-ucontext_t *getNextContext() {
-	if(isQueueEmpty(queue))
-		return NULL;
-	return (queue->front->thread).uctxt;	
-}	
-
-
 void MyThreadInit(void(*start_funct)(void *), void *args) {
-	queue = (ReadyQueue *)malloc(sizeof(ReadyQueue));
-	initializeQueue(queue);
 	
-	createThreadAndAddToQueue(start_funct, args, NULL);
-	Thread thread = removeFromQueue(queue);
-	currentThread = &thread;
-	setcontext(thread.uctxt);
+	readyQueue = (Queue *)malloc(sizeof(Queue));
+	initializeQueue(readyQueue);
+		
+	currentThread = initializeThread(start_funct, args);
+	
+	setcontext(&(currentThread->uctxt));
 }
 
 
 void *MyThreadCreate (void (*start_funct)(void *), void *args) {
-	Thread *thread = createThreadAndAddToQueue(start_funct, args, getNextContext());
+
+	Thread *thread = initializeThread(start_funct, args);
+	insertIntoQueue(readyQueue, thread);
+	
 	return (void *)thread;
-}
+}		
 
 
 void MyThreadYield(void) {
-	/*Thread *this = currentThread;
-	insertIntoQueue(queue, *this);
-	*currentThread = removeFromQueue(queue);
-	swapcontext(this->uctxt, currentThread->uctxt);
-	currentThread = this;
-	printf("HERE");
-	setcontext(this->uctxt);*/
+	Thread *current = currentThread;
+	
+	insertIntoQueue(readyQueue, currentThread);
+	currentThread = removeFromQueue(readyQueue);
+	
+	swapcontext(&(current->uctxt), &(currentThread->uctxt));
 }	
 
+void MyThreadExit(void) {
+	Thread *this = currentThread;
+	
+	if(isQueueEmpty(readyQueue))
+		currentThread = NULL;
+	else 
+		currentThread = removeFromQueue(readyQueue);
+	free((this->uctxt).uc_stack.ss_sp);	
+	free(this);
+	this = NULL;
+}
 
-void function1() {
-	printf("I am here");
-}	
 
+int n;
 
-int main() {
-	MyThreadInit(function1, 0);
-	return 0;
+void t1(void * who){
+  int i;
+
+  printf("t%d start\n", (int)who);
+  for (i = 0; i < n; i++) {
+    printf("t%d yield\n", (int)who);
+    MyThreadYield();
+  }
+  printf("t%d end\n", (int)who);
+  MyThreadExit();
+}
+
+void t0(void * dummy)
+{
+  MyThreadCreate(t1, (void *)1);
+  t1(0);
+}
+
+int main(int argc, char *argv[])
+{
+  if (argc != 2)
+    return -1;
+  n = atoi(argv[1]);
+  MyThreadInit(t0, 0);
 }
