@@ -18,16 +18,16 @@ void MyThreadInit(void(*start_funct)(void *), void *args) {
 	if(getcontext(ctxt) == -1)
 		handle_error("Could not get context");
 		
-	char stack[16384];
+	char *stack = (char *)malloc(16384*sizeof(char));
 	(ctxt->uc_stack).ss_sp = stack;
-	(ctxt->uc_stack).ss_size = sizeof(stack);
+	(ctxt->uc_stack).ss_size = 16384;
 	ctxt->uc_link =  NULL;
 	
 	makecontext(ctxt, (void (*)()) start_funct, 1, args);
 				
 	thread->uctxt = *ctxt;	
 	currentThread = thread;
-	printf("\nInit currentThread = %p\n", currentThread);
+	//printf("\nInit currentThread = %p\n", currentThread);
 	setcontext(&(currentThread->uctxt));
 }
 
@@ -40,9 +40,9 @@ void *MyThreadCreate (void (*start_funct)(void *), void *args) {
 	if(getcontext(ctxt) == -1)
 		handle_error("Could not get context");
 		
-	char stack[16384];
+	char *stack = (char *)malloc(16384*sizeof(char));
 	(ctxt->uc_stack).ss_sp = stack;
-	(ctxt->uc_stack).ss_size = sizeof(stack);
+	(ctxt->uc_stack).ss_size = 16384;
 	ctxt->uc_link = (!isQueueEmpty(queue)) ? &(queue->front->thread->uctxt) : NULL;
 	
 	//printf("\nargs = %d", (int)args);
@@ -52,7 +52,7 @@ void *MyThreadCreate (void (*start_funct)(void *), void *args) {
 	insertIntoQueue(queue, thread);
 	//printf("\nInit currentThread = %p\n", currentThread);
 
-	printf("\nCreated: %p", thread);
+	//printf("\nCreated: %p", thread);
 	//printQueue(queue);
 	return (void *)thread;
 }		
@@ -60,17 +60,17 @@ void *MyThreadCreate (void (*start_funct)(void *), void *args) {
 
 void MyThreadYield(void) {
 	Thread *current = currentThread;
-	printf("\nIn Yield: currentThread = %p", currentThread);
+	//printf("\nIn Yield: currentThread = %p", currentThread);
 	insertIntoQueue(queue, currentThread);
 	currentThread = removeFromQueue(queue);
-	printf("\nNext Thread: currentThread = %p", currentThread);
-	printf("\nBefore swapping: ");
-	printQueue(queue);
-	printf("\nswapping %p %p\n", current, currentThread); 
+	//printf("\nNext Thread: currentThread = %p", currentThread);
+	//printf("\nBefore swapping: ");
+	//printQueue(queue);
+	//printf("\nswapping %p %p\n", current, currentThread); 
 	
 	swapcontext(&(current->uctxt), &(currentThread->uctxt));
-	printf("\nBack in yield\n Current thread: %p", currentThread);
-	printQueue(queue);
+	//printf("\nBack in yield\n Current thread: %p", currentThread);
+	//printQueue(queue);
 }	
 
 void MyThreadExit(void) {
@@ -82,7 +82,8 @@ void MyThreadExit(void) {
 	else 
 		currentThread = removeFromQueue(queue);
 	free(this);
-}	
+	this = NULL;
+}
 
 
 int n;
@@ -90,14 +91,14 @@ int n;
 void t1(void * who){
   int i;
 
-  printf("\n\nwho= %d", (int)who);
-  printf("\nt%d start\n", (int)who);
+  //printf("\n\nwho= %d", (int)who);
+  printf("t%d start\n", (int)who);
   for (i = 0; i < n; i++) {
-    printf("\nt%d yield\n", (int)who);
+    printf("t%d yield\n", (int)who);
     MyThreadYield();
   }
   printf("\nt%d end\n", (int)who);
-  //MyThreadExit();
+  MyThreadExit();
 }
 
 void t0(void * dummy)
@@ -113,4 +114,3 @@ int main(int argc, char *argv[])
   n = atoi(argv[1]);
   MyThreadInit(t0, 0);
 }
-
