@@ -15,9 +15,9 @@ int isQueueEmpty(ReadyQueue *q) {
 	return 0;
 }
 
-void insertIntoQueue(ReadyQueue *q, Thread thread) {
+void insertIntoQueue(ReadyQueue *q, Thread *thread) {
 	node *n = (node *)malloc(sizeof(node));
-	n->thread = &thread;
+	n->thread = thread;
 	n->next = NULL;
 	if(isQueueEmpty(q) == 1) {
 		q->front = n;
@@ -29,7 +29,7 @@ void insertIntoQueue(ReadyQueue *q, Thread thread) {
 	}	
 }		   	
 
-Thread removeFromQueue(ReadyQueue *q) {
+Thread *removeFromQueue(ReadyQueue *q) {
 	if(isQueueEmpty(q) == 1)
 		exit(1);
 	Thread *thread = q->front->thread;	
@@ -37,7 +37,7 @@ Thread removeFromQueue(ReadyQueue *q) {
 		initializeQueue(q);
 	else
 		q->front = q->front->next;
-	return *thread;
+	return thread;
 }
 
 int sizeOfQueue(ReadyQueue *q) {
@@ -49,3 +49,13 @@ int sizeOfQueue(ReadyQueue *q) {
 	}
 	return n;	
 }
+
+void printQueue(ReadyQueue *q) {
+	node *p = q->front;
+	printf("\n.........Queue.......");
+	while(p != NULL) {
+		printf("\n%p", p->thread);
+		p = p->next;
+	}
+	printf("\n.....................");		
+}	

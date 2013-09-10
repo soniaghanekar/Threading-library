@@ -22,6 +22,8 @@ int isQueueEmpty(ReadyQueue *q);
 
 int sizeOfQueue(ReadyQueue *q);
 
-void insertIntoQueue(ReadyQueue *q, Thread thread);
+void insertIntoQueue(ReadyQueue *q, Thread *thread);
 
-Thread removeFromQueue(ReadyQueue *q);
+Thread *removeFromQueue(ReadyQueue *q);
+
+void printQueue(ReadyQueue *q);
