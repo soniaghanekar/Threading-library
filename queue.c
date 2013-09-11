@@ -31,7 +31,7 @@ void insertIntoQueue(Queue *q, Thread *thread) {
 
 Thread *dequeue(Queue *q) {
 	if(isQueueEmpty(q) == 1)
-		exit(1);
+		return NULL;
 	Thread *thread = q->front->thread;	
 	if(q->front == q->rear)
 		initializeQueue(q);
