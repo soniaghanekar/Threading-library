@@ -6,11 +6,22 @@ do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
 Queue *readyQueue;
+Queue *blockedQueue;
 Thread *currentThread;
+Thread *initThread;
+
+Queue *createAndInitializeQueue() {
+	Queue *q = (Queue *)malloc(sizeof(Queue));
+	initializeQueue(q);
+	return q;
+}	
+
 
 Thread *initializeThread(void (*start_funct)(void *), void *args) {
 	
 	Thread *thread = (Thread *)malloc(sizeof(Thread));
+	thread->children = createAndInitializeQueue();
+	
 	ucontext_t *ctxt = (ucontext_t *)malloc(sizeof(ucontext_t));
 	
 	if(getcontext(ctxt) == -1)
@@ -30,10 +41,11 @@ Thread *initializeThread(void (*start_funct)(void *), void *args) {
 
 void MyThreadInit(void(*start_funct)(void *), void *args) {
 	
-	readyQueue = (Queue *)malloc(sizeof(Queue));
-	initializeQueue(readyQueue);
+	readyQueue = createAndInitializeQueue();
+	blockedQueue = createAndInitializeQueue();
 		
 	currentThread = initializeThread(start_funct, args);
+	initThread = currentThread;
 	
 	setcontext(&(currentThread->uctxt));
 }
@@ -44,6 +56,9 @@ void *MyThreadCreate (void (*start_funct)(void *), void *args) {
 	Thread *thread = initializeThread(start_funct, args);
 	insertIntoQueue(readyQueue, thread);
 	
+	insertIntoQueue(currentThread->children, thread);
+	thread->parent = currentThread;
+	
 	return (void *)thread;
 }		
 
@@ -52,7 +67,7 @@ void MyThreadYield(void) {
 	Thread *current = currentThread;
 	
 	insertIntoQueue(readyQueue, currentThread);
-	currentThread = removeFromQueue(readyQueue);
+	currentThread = dequeue(readyQueue);
 	
 	swapcontext(&(current->uctxt), &(currentThread->uctxt));
 }	
@@ -63,7 +78,7 @@ void MyThreadExit(void) {
 	if(isQueueEmpty(readyQueue))
 		currentThread = NULL;
 	else 
-		currentThread = removeFromQueue(readyQueue);
+		currentThread = dequeue(readyQueue);
 	free((this->uctxt).uc_stack.ss_sp);	
 	free(this);
 	this = NULL;

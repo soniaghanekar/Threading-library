@@ -29,7 +29,7 @@ void insertIntoQueue(Queue *q, Thread *thread) {
 	}	
 }		   	
 
-Thread *removeFromQueue(Queue *q) {
+Thread *dequeue(Queue *q) {
 	if(isQueueEmpty(q) == 1)
 		exit(1);
 	Thread *thread = q->front->thread;	
@@ -39,6 +39,21 @@ Thread *removeFromQueue(Queue *q) {
 		q->front = q->front->next;
 	return thread;
 }
+
+int removeFromQueue(Queue *q, Thread *thread) {
+	QueueNode *p = q->front;
+	QueueNode *r = q->front;
+	while(p != NULL) {
+		if(p->thread == thread) {
+			r->next = p->next;
+			free(p);
+			return 1;
+		}	
+		r = p;
+		p = p-> next;
+	}	
+	return 0;
+}	
 
 int sizeOfQueue(Queue *q) {
 	int n=0;
@@ -58,4 +73,16 @@ void printQueue(Queue *q) {
 		p = p->next;
 	}
 	printf("\n.....................");		
+}		
+
+int isPresent(Queue *q, Thread *thread) {
+	QueueNode *p = q->front;
+	while(p != NULL) {
+		if(p->thread == thread)
+			return 1;
+		p = p-> next;	
+	}	
+	return 0;
 }	
+
+
