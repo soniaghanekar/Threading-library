@@ -29,9 +29,9 @@ Thread *initializeThread(void (*start_funct)(void *), void *args) {
 	if(getcontext(ctxt) == -1)
 		handle_error("Could not get context");
 		
-	char *stack = (char *)malloc(16384*sizeof(char));
+	char *stack = (char *)malloc(8192*sizeof(char));
 	(ctxt->uc_stack).ss_sp = stack;
-	(ctxt->uc_stack).ss_size = 16384;
+	(ctxt->uc_stack).ss_size = 8192;
 	ctxt->uc_link = &(currentThread->uctxt);
 	
 	makecontext(ctxt, (void (*)()) start_funct, 1, args);	
@@ -60,7 +60,7 @@ void *MyThreadCreate (void (*start_funct)(void *), void *args) {
 	
 	insertIntoQueue(currentThread->children, thread);
 	thread->parent = currentThread;
-	
+
 	return (void *)thread;
 }		
 
@@ -106,10 +106,12 @@ void MyThreadJoinAll(void) {
 
 void MyThreadExit(void) {
 	Thread *this = currentThread;
-	
-	if(!isQueueEmpty(blockedQueue) && isPresent(blockedQueue, this->parent)) {
-		Thread *parent = this->parent;
+	Thread *parent = this->parent;
+		
+	if(parent != NULL)
 		removeFromQueue(parent->children, this);
+
+	if(!isQueueEmpty(blockedQueue) && isPresent(blockedQueue, parent)) {
 		
 		if(isQueueEmpty(parent->children) || (parent->waitingFor == this)) {
 			removeFromQueue(blockedQueue, parent);
@@ -121,14 +123,19 @@ void MyThreadExit(void) {
 	QueueNode *p = this->children->front;
 	while(p != NULL) {
 		p->thread->parent == initThread;
+		insertIntoQueue(initThread->children, p->thread);
 		p = p->next;
 	}	
 	
 	currentThread = dequeue(readyQueue);
-	
 	free((this->uctxt).uc_stack.ss_sp);	
 	free(this->children);
 	this->children = NULL;
 	free(this);
 	this = NULL;
+	
+	if(currentThread!=NULL)
+		setcontext(&(currentThread->uctxt));
+	else
+		exit(1);
 }

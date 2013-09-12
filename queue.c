@@ -45,7 +45,16 @@ int removeFromQueue(Queue *q, Thread *thread) {
 	QueueNode *r = q->front;
 	while(p != NULL) {
 		if(p->thread == thread) {
-			r->next = p->next;
+			if(p == q->front && p == q->rear)
+				initializeQueue(q);
+			else if(p == q->front)	
+				q->front = p->next;
+			else if(p == q->rear) {
+				q->rear = r;
+				r->next = NULL;
+			}	
+			else	
+				r->next = p->next;
 			free(p);
 			return 1;
 		}	
