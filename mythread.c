@@ -9,6 +9,7 @@ Queue *readyQueue;
 Queue *blockedQueue;
 Thread *currentThread;
 Thread *initThread;
+ucontext_t *initProcesssContext;
 
 Queue *createAndInitializeQueue() {
 	Queue *q = (Queue *)malloc(sizeof(Queue));
@@ -42,6 +43,7 @@ Thread *initializeThread(void (*start_funct)(void *), void *args) {
 
 
 void MyThreadInit(void(*start_funct)(void *), void *args) {
+	initProcesssContext = (ucontext_t *)malloc(sizeof(ucontext_t));
 	
 	readyQueue = createAndInitializeQueue();
 	blockedQueue = createAndInitializeQueue();
@@ -49,7 +51,8 @@ void MyThreadInit(void(*start_funct)(void *), void *args) {
 	currentThread = initializeThread(start_funct, args);
 	initThread = currentThread;
 	
-	setcontext(&(currentThread->uctxt));
+	swapcontext(initProcesssContext, &(currentThread->uctxt));
+	return;
 }
 
 
@@ -137,5 +140,5 @@ void MyThreadExit(void) {
 	if(currentThread!=NULL)
 		setcontext(&(currentThread->uctxt));
 	else
-		exit(1);
+		setcontext(initProcesssContext);
 }
