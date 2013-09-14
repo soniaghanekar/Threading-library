@@ -125,10 +125,14 @@ void MyThreadExit(void) {
 	
 	QueueNode *p = this->children->front;
 	while(p != NULL) {
-		p->thread->parent == initThread;
-		insertIntoQueue(initThread->children, p->thread);
+		if(this == initThread)
+			p->thread->parent = NULL;
+		else {	
+			p->thread->parent = initThread;
+			insertIntoQueue(initThread->children, p->thread);
+		}	
 		p = p->next;
-	}	
+	}		
 	
 	currentThread = dequeue(readyQueue);
 	free((this->uctxt).uc_stack.ss_sp);	
