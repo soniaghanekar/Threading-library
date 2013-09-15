@@ -94,4 +94,40 @@ int isPresent(Queue *q, Thread *thread) {
 	return 0;
 }	
 
+int initializeList(SemList *list) {
+	list->head = NULL;
+}	
+
+int isListEmpty(SemList *list) {
+	if(list->head == NULL)
+		return 1;
+	return 0;	
+}	
+
+void insertIntoList(SemList *list, Semaphore *sem) {
+	ListNode *n = (ListNode *)malloc(sizeof(ListNode));
+	n->sem = sem;
+	n->next = (isListEmpty(list)) ? NULL : list->head->next;
+	list->head = n;
+}	
+
+int removeFromList(SemList *list, Semaphore *sem) {
+	ListNode *p = list->head;
+	ListNode *q = list->head;
+	while(p != NULL) {
+		if(p->sem == sem) {
+			if(p == list->head)
+				list->head = list->head->next;
+			else
+				q->next = p->next;
+			free(p);
+			return 1;	
+		}	
+		q = p;
+		p = p->next;
+	}	
+	return 0;
+}	
+
+
 

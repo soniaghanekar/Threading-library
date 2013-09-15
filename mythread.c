@@ -17,6 +17,21 @@ Queue *createAndInitializeQueue() {
 	return q;
 }	
 
+SemList *createAndInitializeList() {
+	SemList *list = (SemList *)malloc(sizeof(SemList));
+	initializeList(list);
+	return list;
+}	
+
+Thread *getNextThread() {
+	Thread *next = dequeue(readyQueue);
+	if(next == NULL) {
+		setcontext(initProcesssContext);
+		return NULL;
+	}	
+	else	
+		return next;
+}
 
 Thread *initializeThread(void (*start_funct)(void *), void *args) {
 	
@@ -24,6 +39,7 @@ Thread *initializeThread(void (*start_funct)(void *), void *args) {
 	thread->children = createAndInitializeQueue();
 	thread->waitingFor = NULL;
 	thread->parent = NULL;
+	thread->semaphores = createAndInitializeList();
 	
 	ucontext_t *ctxt = (ucontext_t *)malloc(sizeof(ucontext_t));
 	
@@ -73,8 +89,8 @@ void MyThreadYield(void) {
 	Thread *current = currentThread;
 	
 	insertIntoQueue(readyQueue, currentThread);
-	currentThread = dequeue(readyQueue);
-	
+	currentThread = getNextThread();
+
 	swapcontext(&(current->uctxt), &(currentThread->uctxt));
 }
 
@@ -89,7 +105,7 @@ int MyThreadJoin(void *thread) {
 	if(isPresent(currentThread->children, child)) {
 		currentThread->waitingFor = child;
 		insertIntoQueue(blockedQueue, currentThread);
-		currentThread = dequeue(readyQueue);
+		currentThread = getNextThread();
 		swapcontext(&(child->parent->uctxt), &(currentThread->uctxt));
 	}
 	return 0;		
@@ -101,7 +117,7 @@ void MyThreadJoinAll(void) {
 	if(!isQueueEmpty(currentThread->children)) {
 		Thread *this = currentThread;
 		insertIntoQueue(blockedQueue, currentThread);
-		currentThread = dequeue(readyQueue);
+		currentThread = getNextThread();
 		swapcontext(&(this->uctxt), &(currentThread->uctxt));
 	}	
 }	
@@ -134,15 +150,74 @@ void MyThreadExit(void) {
 		p = p->next;
 	}		
 	
-	currentThread = dequeue(readyQueue);
+	if(!isListEmpty(this->semaphores)) {
+		ListNode *p = this->semaphores->head;
+		while(p != NULL) {
+			(p->sem->value)++;
+			removeFromQueue(p->sem->blockedQueue, this);
+			p = p->next;
+		}	
+	}	
+	
+	currentThread = getNextThread();
 	free((this->uctxt).uc_stack.ss_sp);	
 	free(this->children);
 	this->children = NULL;
+	free(this->semaphores);
+	this->semaphores = NULL;
 	free(this);
 	this = NULL;
 	
-	if(currentThread!=NULL)
-		setcontext(&(currentThread->uctxt));
-	else
-		setcontext(initProcesssContext);
+
+	setcontext(&(currentThread->uctxt));
 }
+
+
+MySemaphore MySemaphoreInit(int initialValue) {
+	Semaphore *sem = (Semaphore *)malloc(sizeof(Semaphore));
+	sem->value = initialValue;
+	sem->blockedQueue = createAndInitializeQueue();
+	
+	return (MySemaphore) sem;
+}	
+
+
+void MySemaphoreWait(MySemaphore semaphore) {
+	Semaphore *sem = semaphore;
+	
+	(sem->value)--;
+	insertIntoList(currentThread->semaphores, sem);
+	
+	if(sem->value < 0) {
+		insertIntoQueue(sem->blockedQueue, currentThread);
+		while(sem->value < 0) {
+			Thread *this = currentThread;
+			currentThread = getNextThread();
+			swapcontext(&(this->uctxt), &(currentThread->uctxt));	
+		}
+	}	
+}	
+
+
+void MySemaphoreSignal(MySemaphore semaphore) {
+	Semaphore *sem = semaphore;
+	
+	(sem->value)++;
+	removeFromList(currentThread->semaphores, sem);
+	
+	if(sem->value <= 0) {
+		Thread *thread = dequeue(sem->blockedQueue);
+		insertIntoQueue(readyQueue, thread);
+	}	
+}	
+
+int MySemaphoreDestroy(MySemaphore semaphore) {
+	Semaphore *sem = semaphore;
+	
+	if(sem->value == 0) {
+		free(sem->blockedQueue);
+		return 0;
+	}	
+	return -1;
+}	
+

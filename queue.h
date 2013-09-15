@@ -3,13 +3,21 @@
 #include <stdlib.h>
 
 typedef struct Queue Queue; 
+typedef struct SemaphoreList SemList;
 
 typedef struct Thread {
 	ucontext_t uctxt;
 	struct Thread *parent;
     Queue *children;
 	struct Thread *waitingFor;
+	SemList *semaphores;
 } Thread;	
+
+
+typedef struct Semaphore {
+	int value;
+	Queue *blockedQueue;
+} Semaphore;	
 
 
 typedef struct QueueNode {
@@ -23,6 +31,15 @@ typedef struct Queue {
 	QueueNode *rear;
 } Queue;
 
+
+typedef struct ListNode {
+	Semaphore *sem;
+	struct ListNode *next;
+} ListNode;
+
+typedef struct SemaphoreList {
+	ListNode *head;
+} SemList;		
 
 void initializeQueue(Queue *q);
 
@@ -40,3 +57,10 @@ void printQueue(Queue *q);
 
 int isPresent(Queue *l, Thread *thread);
 
+int initializeList(SemList *list);
+
+int isListEmpty(SemList *list);
+
+void insertIntoList(SemList *list, Semaphore *sem);
+
+int removeFromList(SemList *list, Semaphore *sem);
