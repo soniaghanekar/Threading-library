@@ -33,22 +33,31 @@ Thread *getNextThread() {
 		return next;
 }
 
-Thread *initializeThread(void (*start_funct)(void *), void *args) {
-	
+Thread *allocateMemoryToThread() {
 	Thread *thread = (Thread *)malloc(sizeof(Thread));
 	thread->children = createAndInitializeQueue();
 	thread->waitingFor = NULL;
 	thread->parent = NULL;
 	thread->semaphores = createAndInitializeList();
 	
+	return thread;
+}	
+
+void allocateStackForContext(ucontext_t *ctxt) {
+	char *stack = (char *)malloc(8192*sizeof(char));
+	(ctxt->uc_stack).ss_sp = stack;
+	(ctxt->uc_stack).ss_size = 8192;
+}	
+
+Thread *initializeThread(void (*start_funct)(void *), void *args) {
+	Thread *thread = allocateMemoryToThread();
+	
 	ucontext_t *ctxt = (ucontext_t *)malloc(sizeof(ucontext_t));
 	
 	if(getcontext(ctxt) == -1)
 		handle_error("Could not get context");
 		
-	char *stack = (char *)malloc(8192*sizeof(char));
-	(ctxt->uc_stack).ss_sp = stack;
-	(ctxt->uc_stack).ss_size = 8192;
+	allocateStackForContext(ctxt);	
 	ctxt->uc_link = &(currentThread->uctxt);
 	
 	makecontext(ctxt, (void (*)()) start_funct, 1, args);	
@@ -122,26 +131,26 @@ void MyThreadJoinAll(void) {
 	}	
 }	
 	
-
-void MyThreadExit(void) {
-	Thread *this = currentThread;
-	Thread *parent = this->parent;
-		
+void removeParentFromBlockedQueue(Thread *thread) {
+	Thread *parent = thread->parent;
+	
 	if(parent != NULL)
-		removeFromQueue(parent->children, this);
+		removeFromQueue(parent->children, thread);
 
 	if(!isQueueEmpty(blockedQueue) && isPresent(blockedQueue, parent)) {
 		
-		if(isQueueEmpty(parent->children) || (parent->waitingFor == this)) {
+		if(isQueueEmpty(parent->children) || (parent->waitingFor == thread)) {
 			removeFromQueue(blockedQueue, parent);
 			parent->waitingFor = NULL;
 			insertIntoQueue(readyQueue, parent);
 		}	
-	}	 
-	
-	QueueNode *p = this->children->front;
+	}
+}	
+
+void updateParentFieldForChildren(Thread *thread) {
+	QueueNode *p = thread->children->front;
 	while(p != NULL) {
-		if(this == initThread)
+		if(thread == initThread)
 			p->thread->parent = NULL;
 		else {	
 			p->thread->parent = initThread;
@@ -149,25 +158,39 @@ void MyThreadExit(void) {
 		}	
 		p = p->next;
 	}		
-	
-	if(!isListEmpty(this->semaphores)) {
-		ListNode *p = this->semaphores->head;
+}	
+
+void unblockHeldSemaphores(Thread *thread) {
+	if(!isListEmpty(thread->semaphores)) {
+		ListNode *p = thread->semaphores->head;
 		while(p != NULL) {
 			(p->sem->value)++;
-			removeFromQueue(p->sem->blockedQueue, this);
+			removeFromQueue(p->sem->blockedQueue, thread);
 			p = p->next;
 		}	
-	}	
+	}
+}	
+
+void freeThread(Thread *thread) {
+	free((thread->uctxt).uc_stack.ss_sp);	
+	free(thread->children);
+	thread->children = NULL;
+	free(thread->semaphores);
+	thread->semaphores = NULL;
+	free(thread);
+	thread = NULL;
+}	
+
+void MyThreadExit(void) {
+	Thread *this = currentThread;
+		
+	removeParentFromBlockedQueue(this);	 
+	updateParentFieldForChildren(this);
 	
-	currentThread = getNextThread();
-	free((this->uctxt).uc_stack.ss_sp);	
-	free(this->children);
-	this->children = NULL;
-	free(this->semaphores);
-	this->semaphores = NULL;
-	free(this);
-	this = NULL;
+	unblockHeldSemaphores(this);
 	
+	currentThread = getNextThread();	
+	freeThread(this);	
 
 	setcontext(&(currentThread->uctxt));
 }
