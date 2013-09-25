@@ -38,7 +38,6 @@ Thread *allocateMemoryToThread() {
 	thread->children = createAndInitializeQueue();
 	thread->waitingFor = NULL;
 	thread->parent = NULL;
-	thread->semaphores = createAndInitializeList();
 	
 	return thread;
 }	
@@ -160,23 +159,11 @@ void updateParentFieldForChildren(Thread *thread) {
 	}		
 }	
 
-void unblockHeldSemaphores(Thread *thread) {
-	if(!isListEmpty(thread->semaphores)) {
-		ListNode *p = thread->semaphores->head;
-		while(p != NULL) {
-			(p->sem->value)++;
-			removeFromQueue(p->sem->blockedQueue, thread);
-			p = p->next;
-		}	
-	}
-}	
-
 void freeThread(Thread *thread) {
 	free((thread->uctxt).uc_stack.ss_sp);	
 	free(thread->children);
 	thread->children = NULL;
-	free(thread->semaphores);
-	thread->semaphores = NULL;
+	thread->parent = NULL;
 	free(thread);
 	thread = NULL;
 }	
@@ -186,9 +173,7 @@ void MyThreadExit(void) {
 		
 	removeParentFromBlockedQueue(this);	 
 	updateParentFieldForChildren(this);
-	
-	unblockHeldSemaphores(this);
-	
+		
 	currentThread = getNextThread();	
 	freeThread(this);	
 
@@ -209,15 +194,12 @@ void MySemaphoreWait(MySemaphore semaphore) {
 	Semaphore *sem = semaphore;
 	
 	(sem->value)--;
-	insertIntoList(currentThread->semaphores, sem);
 	
 	if(sem->value < 0) {
 		insertIntoQueue(sem->blockedQueue, currentThread);
-		while(sem->value < 0) {
-			Thread *this = currentThread;
-			currentThread = getNextThread();
-			swapcontext(&(this->uctxt), &(currentThread->uctxt));	
-		}
+		Thread *this = currentThread;
+		currentThread = getNextThread();
+		swapcontext(&(this->uctxt), &(currentThread->uctxt));	
 	}	
 }	
 
@@ -226,8 +208,6 @@ void MySemaphoreSignal(MySemaphore semaphore) {
 	Semaphore *sem = semaphore;
 	
 	(sem->value)++;
-	removeFromList(currentThread->semaphores, sem);
-	
 	if(sem->value <= 0) {
 		Thread *thread = dequeue(sem->blockedQueue);
 		insertIntoQueue(readyQueue, thread);
@@ -243,4 +223,3 @@ int MySemaphoreDestroy(MySemaphore semaphore) {
 	}	
 	return -1;
 }	
-

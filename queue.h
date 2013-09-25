@@ -2,21 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct Queue Queue; 
-typedef struct SemaphoreList SemList;
+struct Queue; 
+struct SemaphoreList;
 
 typedef struct Thread {
 	ucontext_t uctxt;
 	struct Thread *parent;
-    Queue *children;
+    struct Queue *children;
 	struct Thread *waitingFor;
-	SemList *semaphores;
 } Thread;	
 
 
 typedef struct Semaphore {
 	int value;
-	Queue *blockedQueue;
+	struct Queue *blockedQueue;
 } Semaphore;	
 
 
